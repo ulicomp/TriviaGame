@@ -12,76 +12,122 @@ struct QuizReviewView: View {
         return questions[currentQuestionIndex]
     }
 
+    private var progress: Double {
+        guard !questions.isEmpty else { return 0 }
+        return Double(currentQuestionIndex + 1) / Double(questions.count)
+    }
+
     var body: some View {
         NavigationStack {
-            Group {
-                if let currentQuestion {
-                    VStack(spacing: 16) {
-                        Text("Review \(currentQuestionIndex + 1) of \(questions.count)")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .accessibilityLabel("Answer review progress")
-                            .accessibilityValue("Question \(currentQuestionIndex + 1) of \(questions.count)")
+            TriviaBackground {
+                Group {
+                    if let currentQuestion {
+                        VStack(spacing: 16) {
+                            reviewProgress
 
-                        ScrollView {
-                            ReviewQuestionCard(
-                                question: currentQuestion,
-                                selectedAnswerID: selectedAnswerIDs[currentQuestion.id]
-                            )
-                            .padding(.vertical, 4)
+                            ScrollView {
+                                ReviewQuestionCard(
+                                    question: currentQuestion,
+                                    selectedAnswerID: selectedAnswerIDs[currentQuestion.id]
+                                )
+                                .id(currentQuestion.id)
+                                .transition(.opacity.combined(with: .scale(scale: 0.99)))
+                                .padding(.vertical, 4)
+                            }
+                            .scrollIndicators(.hidden)
+
+                            navigationControls
                         }
-
-                        navigationControls
+                        .padding(.horizontal, TriviaTheme.horizontalPadding)
+                        .padding(.top, 12)
+                        .padding(.bottom, 10)
+                        .animation(.easeInOut(duration: 0.22), value: currentQuestionIndex)
+                    } else {
+                        unavailableContent
                     }
-                    .padding()
-                } else {
-                    unavailableContent
                 }
             }
-            .navigationTitle("Review Answers")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Back to Results", action: onBackToResults)
+                    Button(action: onBackToResults) {
+                        Label("Results", systemImage: "chevron.left")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(TriviaTheme.primary)
+                    }
+                    .accessibilityLabel("Back to Results")
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text("Answer Review")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(TriviaTheme.textPrimary)
                 }
             }
         }
+    }
+
+    private var reviewProgress: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Review \(currentQuestionIndex + 1)")
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                Spacer()
+                Text("of \(questions.count)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TriviaTheme.textSecondary)
+            }
+
+            TriviaProgressBar(progress: progress)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Answer review progress")
+        .accessibilityValue("Question \(currentQuestionIndex + 1) of \(questions.count)")
     }
 
     private var navigationControls: some View {
         HStack(spacing: 12) {
-            Button("Previous") {
+            Button {
                 guard currentQuestionIndex > questions.startIndex else { return }
                 currentQuestionIndex -= 1
+            } label: {
+                Label("Previous", systemImage: "chevron.left")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(TriviaSecondaryButtonStyle())
             .disabled(currentQuestionIndex == questions.startIndex)
+            .opacity(currentQuestionIndex == questions.startIndex ? 0.45 : 1)
 
-            Spacer()
-
-            Button("Next") {
+            Button {
                 let nextIndex = currentQuestionIndex + 1
                 guard questions.indices.contains(nextIndex) else { return }
                 currentQuestionIndex = nextIndex
+            } label: {
+                HStack {
+                    Text("Next")
+                    Image(systemName: "chevron.right")
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
+            .buttonStyle(TriviaPrimaryButtonStyle())
             .disabled(currentQuestionIndex + 1 >= questions.count)
+            .opacity(currentQuestionIndex + 1 >= questions.count ? 0.45 : 1)
         }
     }
 
     private var unavailableContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
+            Image(systemName: "doc.questionmark.fill")
+                .font(.system(size: 44))
+                .foregroundStyle(TriviaTheme.primary)
+                .accessibilityHidden(true)
             Text("Review Unavailable")
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .bold))
             Text("This answer review could not be displayed.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TriviaTheme.textSecondary)
             Button("Back to Results", action: onBackToResults)
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                .buttonStyle(TriviaPrimaryButtonStyle())
         }
         .multilineTextAlignment(.center)
-        .padding()
+        .padding(TriviaTheme.horizontalPadding)
     }
 }
 
@@ -95,54 +141,75 @@ private struct ReviewQuestionCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(question.category)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.purple)
-
-                Text(question.difficulty.capitalized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        TriviaCard {
+            VStack(alignment: .leading, spacing: 20) {
+                categoryAndDifficulty
 
                 Text(question.questionText)
-                    .font(.title3.weight(.semibold))
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-            }
+                    .accessibilityAddTraits(.isHeader)
 
-            outcomeLabel
+                outcomeLabel
 
-            VStack(spacing: 12) {
-                ForEach(question.answerChoices) { answer in
-                    ReviewAnswerOption(
-                        answer: answer,
-                        state: reviewState(for: answer)
-                    )
+                VStack(spacing: 12) {
+                    ForEach(question.answerChoices) { answer in
+                        ReviewAnswerOption(
+                            answer: answer,
+                            state: reviewState(for: answer)
+                        )
+                    }
                 }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.background)
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-        )
+    }
+
+    private var categoryAndDifficulty: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                TriviaCapsuleLabel(title: question.category, systemImage: "sparkles")
+                TriviaCapsuleLabel(
+                    title: question.difficulty.capitalized,
+                    systemImage: "chart.bar.fill",
+                    color: TriviaTheme.accent
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                TriviaCapsuleLabel(title: question.category, systemImage: "sparkles")
+                TriviaCapsuleLabel(
+                    title: question.difficulty.capitalized,
+                    systemImage: "chart.bar.fill",
+                    color: TriviaTheme.accent
+                )
+            }
+        }
     }
 
     @ViewBuilder
     private var outcomeLabel: some View {
         if let selectedAnswer {
+            let isCorrect = selectedAnswer.isCorrect
             Label(
-                selectedAnswer.isCorrect ? "Answered correctly" : "Answered incorrectly",
-                systemImage: selectedAnswer.isCorrect ? "checkmark.circle.fill" : "xmark.circle.fill"
+                isCorrect ? "Answered correctly" : "Answered incorrectly",
+                systemImage: isCorrect ? "checkmark.seal.fill" : "xmark.circle.fill"
             )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(selectedAnswer.isCorrect ? Color.green : Color.red)
+            .font(.subheadline.weight(.bold))
+            .foregroundStyle(isCorrect ? TriviaTheme.success : TriviaTheme.error)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                (isCorrect ? TriviaTheme.success : TriviaTheme.error).opacity(0.10),
+                in: Capsule()
+            )
         } else {
             Label("Not answered", systemImage: "minus.circle.fill")
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.orange)
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(TriviaTheme.warning)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(TriviaTheme.warning.opacity(0.10), in: Capsule())
                 .accessibilityLabel("Not answered")
         }
     }
@@ -163,34 +230,35 @@ private struct ReviewAnswerOption: View {
     let state: ReviewAnswerState
 
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: 13) {
+            Image(systemName: state.symbolName)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(state.foregroundColor)
+                .frame(width: 28)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
                 Text(answer.text)
+                    .font(.body.weight(.medium))
+                    .foregroundStyle(TriviaTheme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let statusText = state.statusText {
                     Text(statusText)
-                        .font(.caption.weight(.semibold))
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(state.foregroundColor)
                 }
             }
 
-            Spacer(minLength: 8)
-
-            if let symbolName = state.symbolName {
-                Image(systemName: symbolName)
-                    .accessibilityHidden(true)
-            }
+            Spacer(minLength: 4)
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .foregroundStyle(state.foregroundColor)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(state.backgroundColor)
-        )
+        .padding(.horizontal, 15)
+        .padding(.vertical, 14)
+        .frame(maxWidth: .infinity, minHeight: 58, alignment: .leading)
+        .background(state.backgroundColor, in: RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius))
         .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(state.borderColor, lineWidth: state == .neutral ? 1 : 2)
+            RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius)
+                .stroke(state.borderColor, lineWidth: state == .neutral ? 1 : 1.5)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(answer.text)
@@ -206,31 +274,31 @@ private enum ReviewAnswerState: Equatable {
 
     var foregroundColor: Color {
         switch self {
-        case .neutral: .primary
-        case .selectedCorrect, .correctAnswer: .green
-        case .selectedIncorrect: .red
+        case .neutral: TriviaTheme.textSecondary
+        case .selectedCorrect, .correctAnswer: TriviaTheme.success
+        case .selectedIncorrect: TriviaTheme.error
         }
     }
 
     var backgroundColor: Color {
         switch self {
-        case .neutral: Color.secondary.opacity(0.08)
-        case .selectedCorrect, .correctAnswer: Color.green.opacity(0.12)
-        case .selectedIncorrect: Color.red.opacity(0.12)
+        case .neutral: TriviaTheme.background.opacity(0.55)
+        case .selectedCorrect, .correctAnswer: TriviaTheme.success.opacity(0.10)
+        case .selectedIncorrect: TriviaTheme.error.opacity(0.10)
         }
     }
 
     var borderColor: Color {
         switch self {
-        case .neutral: Color.secondary.opacity(0.3)
-        case .selectedCorrect, .correctAnswer: .green
-        case .selectedIncorrect: .red
+        case .neutral: TriviaTheme.border.opacity(0.8)
+        case .selectedCorrect, .correctAnswer: TriviaTheme.success.opacity(0.65)
+        case .selectedIncorrect: TriviaTheme.error.opacity(0.65)
         }
     }
 
-    var symbolName: String? {
+    var symbolName: String {
         switch self {
-        case .neutral: nil
+        case .neutral: "circle"
         case .selectedCorrect, .correctAnswer: "checkmark.circle.fill"
         case .selectedIncorrect: "xmark.circle.fill"
         }

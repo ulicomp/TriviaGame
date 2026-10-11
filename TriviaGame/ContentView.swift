@@ -73,73 +73,136 @@ struct ContentView: View {
         .onChange(of: scenePhase) { _, newPhase in
             handleScenePhase(newPhase)
         }
+        .preferredColorScheme(.light)
     }
 
     private func optionsView(loadState: LoadState) -> some View {
         NavigationStack {
-            Form {
-                Section("Quiz Options") {
-                    Stepper(
-                        "Number of Questions: \(configuration.questionCount)",
-                        value: $configuration.questionCount,
-                        in: TriviaConfiguration.questionCountRange
-                    )
+            TriviaBackground {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        optionsHero
 
-                    Picker("Category", selection: $configuration.category) {
-                        ForEach(TriviaCategory.allCases) { category in
-                            Text(category.displayName).tag(category)
-                        }
-                    }
+                        TriviaCard {
+                            VStack(spacing: 4) {
+                                Text("BUILD YOUR QUIZ")
+                                    .font(.caption.weight(.bold))
+                                    .tracking(1.4)
+                                    .foregroundStyle(TriviaTheme.primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.bottom, 8)
 
-                    Picker("Difficulty", selection: $configuration.difficulty) {
-                        ForEach(TriviaDifficulty.allCases) { difficulty in
-                            Text(difficulty.displayName).tag(difficulty)
-                        }
-                    }
+                                QuestionCountRow(questionCount: $configuration.questionCount)
 
-                    Picker("Question Type", selection: $configuration.questionType) {
-                        ForEach(TriviaQuestionType.allCases) { questionType in
-                            Text(questionType.displayName).tag(questionType)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
+                                Divider().overlay(TriviaTheme.border.opacity(0.7))
 
-                Section {
-                    Button {
-                        Task {
-                            await loadQuiz(context: .options)
-                        }
-                    } label: {
-                        HStack {
-                            Spacer()
-                            if loadState.isLoading {
-                                ProgressView()
-                                    .padding(.trailing, 4)
+                                Menu {
+                                    Picker("Category", selection: $configuration.category) {
+                                        ForEach(TriviaCategory.allCases) { category in
+                                            Text(category.displayName).tag(category)
+                                        }
+                                    }
+                                } label: {
+                                    ConfigurationRow(
+                                        icon: "square.grid.2x2.fill",
+                                        title: "Category",
+                                        value: configuration.category.displayName
+                                    )
+                                }
+
+                                Divider().overlay(TriviaTheme.border.opacity(0.7))
+
+                                Menu {
+                                    Picker("Difficulty", selection: $configuration.difficulty) {
+                                        ForEach(TriviaDifficulty.allCases) { difficulty in
+                                            Text(difficulty.displayName).tag(difficulty)
+                                        }
+                                    }
+                                } label: {
+                                    ConfigurationRow(
+                                        icon: "chart.bar.fill",
+                                        title: "Difficulty",
+                                        value: configuration.difficulty.displayName
+                                    )
+                                }
+
+                                Divider().overlay(TriviaTheme.border.opacity(0.7))
+
+                                Menu {
+                                    Picker("Question Type", selection: $configuration.questionType) {
+                                        ForEach(TriviaQuestionType.allCases) { questionType in
+                                            Text(questionType.displayName).tag(questionType)
+                                        }
+                                    }
+                                } label: {
+                                    ConfigurationRow(
+                                        icon: "list.bullet.rectangle.fill",
+                                        title: "Type",
+                                        value: configuration.questionType.displayName
+                                    )
+                                }
                             }
-                            Text(loadState.isLoading ? "Loading..." : "Start Trivia")
-                            Spacer()
                         }
-                    }
-                    .disabled(loadState.isLoading)
-                }
 
-                statusSection(loadState: loadState)
+                        if case .failure(let message) = loadState {
+                            InlineErrorCard(message: message)
+                        }
+
+                        Button {
+                            Task {
+                                await loadQuiz(context: .options)
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                if loadState.isLoading {
+                                    ProgressView()
+                                        .tint(.white)
+                                    Text("Preparing your quiz…")
+                                } else {
+                                    Image(systemName: loadState.isFailure ? "arrow.clockwise" : "play.fill")
+                                    Text(loadState.isFailure ? "Try Again" : "Start Trivia")
+                                }
+                            }
+                        }
+                        .buttonStyle(TriviaPrimaryButtonStyle())
+                        .disabled(loadState.isLoading)
+                        .opacity(loadState.isLoading ? 0.78 : 1)
+                    }
+                    .padding(.horizontal, TriviaTheme.horizontalPadding)
+                    .padding(.top, 22)
+                    .padding(.bottom, 36)
+                }
+                .scrollIndicators(.hidden)
             }
-            .navigationTitle("Trivia Game")
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 
-    @ViewBuilder
-    private func statusSection(loadState: LoadState) -> some View {
-        switch loadState {
-        case .idle, .loading:
-            EmptyView()
-        case .failure(let message):
-            Section("Error") {
-                Text(message)
-                    .foregroundStyle(.red)
+    private var optionsHero: some View {
+        VStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(TriviaTheme.brandGradient)
+                    .frame(width: 82, height: 82)
+                    .shadow(color: TriviaTheme.primary.opacity(0.28), radius: 18, y: 9)
+
+                Image(systemName: "questionmark.bubble.fill")
+                    .font(.system(size: 38, weight: .bold))
+                    .foregroundStyle(.white)
             }
+            .accessibilityHidden(true)
+
+            VStack(spacing: 6) {
+                Text("Trivia Quiz")
+                    .font(.system(.largeTitle, design: .rounded, weight: .bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
+                    .accessibilityAddTraits(.isHeader)
+
+                Text("Put your knowledge to the test")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(TriviaTheme.textSecondary)
+            }
+            .multilineTextAlignment(.center)
         }
     }
 
@@ -320,6 +383,120 @@ struct ContentView: View {
     }
 }
 
+private struct QuestionCountRow: View {
+    @Binding var questionCount: Int
+
+    var body: some View {
+        HStack(spacing: 14) {
+            configurationIcon
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Questions")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TriviaTheme.textSecondary)
+                Text("\(questionCount)")
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
+            }
+            .accessibilityHidden(true)
+
+            Spacer(minLength: 8)
+
+            Stepper(
+                "Number of questions",
+                value: $questionCount,
+                in: TriviaConfiguration.questionCountRange
+            )
+            .labelsHidden()
+            .tint(TriviaTheme.primary)
+            .accessibilityLabel("Number of questions")
+            .accessibilityValue("\(questionCount)")
+        }
+        .padding(.vertical, 10)
+    }
+
+    private var configurationIcon: some View {
+        Image(systemName: "number.circle.fill")
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(TriviaTheme.primary)
+            .frame(width: 42, height: 42)
+            .background(TriviaTheme.surfaceTint, in: RoundedRectangle(cornerRadius: 13))
+            .accessibilityHidden(true)
+    }
+}
+
+private struct ConfigurationRow: View {
+    let icon: String
+    let title: String
+    let value: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(TriviaTheme.primary)
+                .frame(width: 42, height: 42)
+                .background(TriviaTheme.surfaceTint, in: RoundedRectangle(cornerRadius: 13))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TriviaTheme.textSecondary)
+
+                Text(value)
+                    .font(.body.weight(.bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: "chevron.up.chevron.down")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(TriviaTheme.primary)
+                .accessibilityHidden(true)
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+        .accessibilityHint("Double tap to change")
+    }
+}
+
+private struct InlineErrorCard: View {
+    let message: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.title3)
+                .foregroundStyle(TriviaTheme.error)
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Unable to prepare quiz")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(TriviaTheme.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(TriviaTheme.error.opacity(0.08), in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(TriviaTheme.error.opacity(0.28), lineWidth: 1)
+        }
+    }
+}
+
 private enum AppState {
     case options(LoadState)
     case activeQuiz
@@ -341,6 +518,13 @@ private enum LoadState {
 
     var isLoading: Bool {
         if case .loading = self {
+            return true
+        }
+        return false
+    }
+
+    var isFailure: Bool {
+        if case .failure = self {
             return true
         }
         return false

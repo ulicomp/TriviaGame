@@ -23,35 +23,57 @@ struct QuizView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if let currentQuestion {
-                    VStack(spacing: 16) {
-                        progressHeader
+            TriviaBackground {
+                Group {
+                    if let currentQuestion {
+                        VStack(spacing: 16) {
+                            progressHeader
 
-                        ScrollView {
-                            QuestionCard(
-                                question: currentQuestion,
-                                selectedAnswerID: selectedAnswerIDs[currentQuestion.id],
-                                onSelectAnswer: { answerID in
-                                    selectedAnswerIDs[currentQuestion.id] = answerID
-                                }
-                            )
-                            .padding(.vertical, 4)
+                            ScrollView {
+                                QuestionCard(
+                                    question: currentQuestion,
+                                    selectedAnswerID: selectedAnswerIDs[currentQuestion.id],
+                                    onSelectAnswer: { answerID in
+                                        selectedAnswerIDs[currentQuestion.id] = answerID
+                                    }
+                                )
+                                .id(currentQuestion.id)
+                                .transition(.opacity.combined(with: .scale(scale: 0.99)))
+                                .padding(.vertical, 4)
+                            }
+                            .scrollIndicators(.hidden)
+
+                            navigationControls
                         }
-
-                        navigationControls
+                        .padding(.horizontal, TriviaTheme.horizontalPadding)
+                        .padding(.top, 12)
+                        .padding(.bottom, 10)
+                        .animation(.easeInOut(duration: 0.22), value: currentQuestionIndex)
+                    } else {
+                        unavailableContent
                     }
-                    .padding()
-                } else {
-                    unavailableContent
                 }
             }
-            .navigationTitle("Quiz")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Change Options", action: onChangeOptions)
-                        .accessibilityHint("Ends this quiz and returns to quiz options")
+                    Button(action: onChangeOptions) {
+                        Label("Options", systemImage: "chevron.left")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(TriviaTheme.primary)
+                    }
+                    .accessibilityLabel("Change Options")
+                    .accessibilityHint("Ends this quiz and returns to quiz options")
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text("Trivia Quiz")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(TriviaTheme.textPrimary)
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    QuizTimerPill(remainingSeconds: remainingSeconds)
                 }
             }
             .confirmationDialog(
@@ -68,46 +90,59 @@ struct QuizView: View {
     }
 
     private var progressHeader: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Question \(currentQuestionIndex + 1) of \(questions.count)")
-                    .font(.headline)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Question \(currentQuestionIndex + 1)")
+                    .font(.system(.title2, design: .rounded, weight: .bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
 
                 Spacer()
 
-                QuizTimerBadge(remainingSeconds: remainingSeconds)
+                Text("of \(questions.count)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(TriviaTheme.textSecondary)
             }
 
-            ProgressView(value: progress)
-                .tint(.purple)
+            TriviaProgressBar(progress: progress)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Quiz progress")
+        .accessibilityValue("Question \(currentQuestionIndex + 1) of \(questions.count)")
     }
 
     private var navigationControls: some View {
         HStack(spacing: 12) {
-            Button("Previous") {
+            Button {
                 guard currentQuestionIndex > questions.startIndex else { return }
                 currentQuestionIndex -= 1
+            } label: {
+                Label("Previous", systemImage: "chevron.left")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(TriviaSecondaryButtonStyle())
             .disabled(currentQuestionIndex == questions.startIndex)
-
-            Spacer()
+            .opacity(currentQuestionIndex == questions.startIndex ? 0.45 : 1)
 
             if currentQuestionIndex < questions.index(before: questions.endIndex) {
-                Button("Next") {
+                Button {
                     let nextIndex = currentQuestionIndex + 1
                     guard questions.indices.contains(nextIndex) else { return }
                     currentQuestionIndex = nextIndex
+                } label: {
+                    HStack {
+                        Text("Next")
+                        Image(systemName: "chevron.right")
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                .buttonStyle(TriviaPrimaryButtonStyle())
             } else {
-                Button("Submit Quiz", action: requestSubmission)
-                    .buttonStyle(.borderedProminent)
-                    .tint(.purple)
-                    .accessibilityHint("Finishes the quiz and calculates your score")
+                Button(action: requestSubmission) {
+                    HStack {
+                        Text("Submit Quiz")
+                        Image(systemName: "checkmark.circle.fill")
+                    }
+                }
+                .buttonStyle(TriviaPrimaryButtonStyle())
+                .accessibilityHint("Finishes the quiz and calculates your score")
             }
         }
     }
@@ -126,40 +161,49 @@ struct QuizView: View {
     }
 
     private var unavailableContent: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 18) {
+            Image(systemName: "questionmark.app.dashed")
+                .font(.system(size: 44))
+                .foregroundStyle(TriviaTheme.primary)
+                .accessibilityHidden(true)
+
             Text("Quiz Unavailable")
-                .font(.title2.bold())
+                .font(.system(.title2, design: .rounded, weight: .bold))
             Text("The current question could not be displayed.")
-                .foregroundStyle(.secondary)
+                .foregroundStyle(TriviaTheme.textSecondary)
             Button("Return to Options", action: onChangeOptions)
-                .buttonStyle(.borderedProminent)
-                .tint(.purple)
+                .buttonStyle(TriviaPrimaryButtonStyle())
         }
         .multilineTextAlignment(.center)
-        .padding()
+        .padding(TriviaTheme.horizontalPadding)
     }
 }
 
-private struct QuizTimerBadge: View {
+private struct QuizTimerPill: View {
     let remainingSeconds: Int
 
     private var color: Color {
         if remainingSeconds <= 10 {
-            return .red
+            return TriviaTheme.error
         }
         if remainingSeconds <= 30 {
-            return .orange
+            return TriviaTheme.warning
         }
-        return .purple
+        return TriviaTheme.primary
     }
 
     var body: some View {
         Label(QuizTimer.formattedTime(remainingSeconds), systemImage: "clock.fill")
-            .font(.subheadline.monospacedDigit().weight(.semibold))
+            .font(.caption.monospacedDigit().weight(.bold))
             .foregroundStyle(color)
             .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(color.opacity(0.12), in: Capsule())
+            .padding(.vertical, 7)
+            .background(TriviaTheme.surface, in: Capsule())
+            .overlay {
+                Capsule().stroke(color.opacity(0.35), lineWidth: 1)
+            }
+            .shadow(color: color.opacity(0.12), radius: 6, y: 3)
+            .animation(.easeInOut(duration: 0.2), value: color)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Time remaining")
             .accessibilityValue(QuizTimer.accessibilityDescription(remainingSeconds))
@@ -172,38 +216,49 @@ private struct QuestionCard: View {
     let onSelectAnswer: (TriviaAnswerChoice.ID) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(question.category)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.purple)
-
-                Text(question.difficulty.capitalized)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        TriviaCard {
+            VStack(alignment: .leading, spacing: 22) {
+                categoryAndDifficulty
 
                 Text(question.questionText)
-                    .font(.title3.weight(.semibold))
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
                     .fixedSize(horizontal: false, vertical: true)
-            }
+                    .accessibilityAddTraits(.isHeader)
 
-            VStack(spacing: 12) {
-                ForEach(question.answerChoices) { answer in
-                    AnswerOptionView(
-                        answer: answer,
-                        isSelected: selectedAnswerID == answer.id,
-                        onSelect: { onSelectAnswer(answer.id) }
-                    )
+                VStack(spacing: 12) {
+                    ForEach(question.answerChoices) { answer in
+                        AnswerOptionView(
+                            answer: answer,
+                            isSelected: selectedAnswerID == answer.id,
+                            onSelect: { onSelectAnswer(answer.id) }
+                        )
+                    }
                 }
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.background)
-                .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-        )
+    }
+
+    private var categoryAndDifficulty: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                TriviaCapsuleLabel(title: question.category, systemImage: "sparkles")
+                TriviaCapsuleLabel(
+                    title: question.difficulty.capitalized,
+                    systemImage: "chart.bar.fill",
+                    color: TriviaTheme.accent
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                TriviaCapsuleLabel(title: question.category, systemImage: "sparkles")
+                TriviaCapsuleLabel(
+                    title: question.difficulty.capitalized,
+                    systemImage: "chart.bar.fill",
+                    color: TriviaTheme.accent
+                )
+            }
+        }
     }
 }
 
@@ -214,31 +269,44 @@ private struct AnswerOptionView: View {
 
     var body: some View {
         Button(action: onSelect) {
-            HStack(spacing: 12) {
+            HStack(spacing: 13) {
+                ZStack {
+                    Circle()
+                        .fill(isSelected ? TriviaTheme.primary : TriviaTheme.surfaceTint)
+                        .frame(width: 30, height: 30)
+
+                    Image(systemName: isSelected ? "checkmark" : "circle")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(isSelected ? .white : TriviaTheme.primary.opacity(0.55))
+                }
+                .accessibilityHidden(true)
+
                 Text(answer.text)
+                    .font(.body.weight(.medium))
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 8)
-
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .accessibilityHidden(true)
-                }
+                Spacer(minLength: 4)
             }
-            .padding()
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .foregroundStyle(isSelected ? Color.purple : Color.primary)
+            .padding(.horizontal, 15)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+            .foregroundStyle(isSelected ? TriviaTheme.primaryDeep : TriviaTheme.textPrimary)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(isSelected ? Color.purple.opacity(0.12) : Color.secondary.opacity(0.08))
+                isSelected ? TriviaTheme.primary.opacity(0.10) : TriviaTheme.background.opacity(0.55),
+                in: RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(isSelected ? Color.purple : Color.secondary.opacity(0.3), lineWidth: isSelected ? 2 : 1)
+                RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius)
+                    .stroke(
+                        isSelected ? TriviaTheme.primary : TriviaTheme.border.opacity(0.8),
+                        lineWidth: isSelected ? 2 : 1
+                    )
             }
+            .shadow(color: isSelected ? TriviaTheme.primary.opacity(0.10) : .clear, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
         .accessibilityLabel(answer.text)
         .accessibilityValue(isSelected ? "Selected" : "Not selected")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
