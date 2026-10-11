@@ -3,11 +3,28 @@ import SwiftUI
 struct ContentView: View {
     @State private var configuration = TriviaConfiguration()
     @State private var questions: [TriviaQuestion] = []
+    @State private var preparedQuestions: [PreparedTriviaQuestion] = []
+    @State private var currentQuestionIndex = 0
+    @State private var selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID] = [:]
+    @State private var isShowingQuiz = false
     @State private var loadState = LoadState.idle
 
     private let triviaService = TriviaService()
 
     var body: some View {
+        if isShowingQuiz {
+            QuizView(
+                questions: preparedQuestions,
+                currentQuestionIndex: $currentQuestionIndex,
+                selectedAnswerIDs: $selectedAnswerIDs,
+                onChangeOptions: returnToOptions
+            )
+        } else {
+            optionsView
+        }
+    }
+
+    private var optionsView: some View {
         NavigationStack {
             Form {
                 Section("Quiz Options") {
@@ -67,11 +84,6 @@ struct ContentView: View {
         switch loadState {
         case .idle, .loading:
             EmptyView()
-        case .success(let count):
-            Section("Status") {
-                Text("Loaded \(count) questions")
-                    .foregroundStyle(.green)
-            }
         case .failure(let message):
             Section("Error") {
                 Text(message)
@@ -88,18 +100,33 @@ struct ContentView: View {
 
         do {
             questions = try await triviaService.fetchQuestions(configuration: configuration)
-            loadState = .success(questions.count)
+            preparedQuestions = try PreparedTriviaQuestion.prepare(questions)
+            selectedAnswerIDs = [:]
+            currentQuestionIndex = 0
+            loadState = .idle
+            isShowingQuiz = true
         } catch {
             questions = []
+            preparedQuestions = []
+            selectedAnswerIDs = [:]
+            currentQuestionIndex = 0
             loadState = .failure(error.localizedDescription)
         }
+    }
+
+    private func returnToOptions() {
+        questions = []
+        preparedQuestions = []
+        selectedAnswerIDs = [:]
+        currentQuestionIndex = 0
+        loadState = .idle
+        isShowingQuiz = false
     }
 }
 
 private enum LoadState {
     case idle
     case loading
-    case success(Int)
     case failure(String)
 
     var isLoading: Bool {
