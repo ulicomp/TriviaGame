@@ -1,63 +1,77 @@
 import SwiftUI
 
 struct ContentView: View {
+    @Environment(\.scenePhase) private var scenePhase
+
     @State private var configuration = TriviaConfiguration()
     @State private var questions: [TriviaQuestion] = []
     @State private var preparedQuestions: [PreparedTriviaQuestion] = []
     @State private var currentQuestionIndex = 0
     @State private var selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID] = [:]
     @State private var appState = AppState.options(.idle)
+    @State private var quizSessionID: UUID?
+    @State private var quizDeadline: Date?
+    @State private var remainingSeconds = 0
+    @State private var timerTask: Task<Void, Never>?
 
     private let triviaService = TriviaService()
 
     var body: some View {
-        switch appState {
-        case .options(let loadState):
-            optionsView(loadState: loadState)
-        case .activeQuiz:
-            QuizView(
-                questions: preparedQuestions,
-                currentQuestionIndex: $currentQuestionIndex,
-                selectedAnswerIDs: $selectedAnswerIDs,
-                unansweredCount: unansweredCount,
-                onSubmit: submitQuiz,
-                onChangeOptions: returnToOptions
-            )
-        case .completed(let result):
-            ResultsView(
-                result: result,
-                onReviewAnswers: beginReview,
-                onPlayAgain: {
-                    Task {
-                        await loadQuiz(context: .replay)
+        Group {
+            switch appState {
+            case .options(let loadState):
+                optionsView(loadState: loadState)
+            case .activeQuiz:
+                QuizView(
+                    questions: preparedQuestions,
+                    currentQuestionIndex: $currentQuestionIndex,
+                    selectedAnswerIDs: $selectedAnswerIDs,
+                    remainingSeconds: remainingSeconds,
+                    unansweredCount: unansweredCount,
+                    onSubmit: {
+                        submitQuiz()
+                    },
+                    onChangeOptions: returnToOptions
+                )
+            case .completed(let result):
+                ResultsView(
+                    result: result,
+                    onReviewAnswers: beginReview,
+                    onPlayAgain: {
+                        Task {
+                            await loadQuiz(context: .replay)
+                        }
+                    },
+                    onChangeOptions: returnToOptions
+                )
+            case .reviewing(let result):
+                QuizReviewView(
+                    questions: preparedQuestions,
+                    selectedAnswerIDs: selectedAnswerIDs,
+                    onBackToResults: {
+                        returnToResults(result: result)
                     }
-                },
-                onChangeOptions: returnToOptions
-            )
-        case .reviewing(let result):
-            QuizReviewView(
-                questions: preparedQuestions,
-                selectedAnswerIDs: selectedAnswerIDs,
-                onBackToResults: {
-                    returnToResults(result: result)
-                }
-            )
-        case .replaying:
-            ReplayStatusView(
-                errorMessage: nil,
-                onRetry: {},
-                onChangeOptions: returnToOptions
-            )
-        case .replayFailure(let message):
-            ReplayStatusView(
-                errorMessage: message,
-                onRetry: {
-                    Task {
-                        await loadQuiz(context: .replay)
-                    }
-                },
-                onChangeOptions: returnToOptions
-            )
+                )
+            case .replaying:
+                ReplayStatusView(
+                    errorMessage: nil,
+                    onRetry: {},
+                    onChangeOptions: returnToOptions
+                )
+            case .replayFailure(let message):
+                ReplayStatusView(
+                    errorMessage: message,
+                    onRetry: {
+                        Task {
+                            await loadQuiz(context: .replay)
+                        }
+                    },
+                    onChangeOptions: returnToOptions
+                )
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            handleScenePhase(newPhase)
         }
     }
 
@@ -143,6 +157,7 @@ struct ContentView: View {
     private func loadQuiz(context: LoadContext) async {
         guard canBeginLoading(context: context) else { return }
 
+        invalidateTimer()
         resetQuizData()
         appState = context == .options ? .options(.loading) : .replaying
 
@@ -151,8 +166,9 @@ struct ContentView: View {
             preparedQuestions = try PreparedTriviaQuestion.prepare(questions)
             selectedAnswerIDs = [:]
             currentQuestionIndex = 0
-            appState = .activeQuiz
+            beginActiveQuiz()
         } catch {
+            invalidateTimer()
             resetQuizData()
             appState = context == .options
                 ? .options(.failure(error.localizedDescription))
@@ -161,18 +177,118 @@ struct ContentView: View {
     }
 
     private func returnToOptions() {
+        invalidateTimer()
         resetQuizData()
         appState = .options(.idle)
     }
 
-    private func submitQuiz() {
-        guard case .activeQuiz = appState else { return }
+    private func submitQuiz(expectedSessionID: UUID? = nil) {
+        guard case .activeQuiz = appState,
+              let activeSessionID = quizSessionID,
+              expectedSessionID == nil || expectedSessionID == activeSessionID else {
+            return
+        }
 
         let result = QuizResult.calculate(
             questions: preparedQuestions,
             selectedAnswerIDs: selectedAnswerIDs
         )
+
+        invalidateTimer()
         appState = .completed(result)
+    }
+
+    private func beginActiveQuiz() {
+        let duration = QuizTimer.duration(forQuestionCount: preparedQuestions.count)
+        guard duration > 0 else {
+            appState = .options(.failure("The quiz did not contain any questions."))
+            return
+        }
+
+        let sessionID = UUID()
+        quizSessionID = sessionID
+        remainingSeconds = duration
+        quizDeadline = Date().addingTimeInterval(TimeInterval(duration))
+        appState = .activeQuiz
+
+        if scenePhase == .active {
+            startTimer(for: sessionID)
+        }
+    }
+
+    private func startTimer(for sessionID: UUID) {
+        timerTask?.cancel()
+
+        guard case .activeQuiz = appState,
+              quizSessionID == sessionID,
+              quizDeadline != nil else {
+            timerTask = nil
+            return
+        }
+
+        timerTask = Task { @MainActor in
+            while !Task.isCancelled {
+                guard case .activeQuiz = appState,
+                      quizSessionID == sessionID,
+                      let deadline = quizDeadline else {
+                    return
+                }
+
+                let updatedRemainingSeconds = QuizTimer.remainingSeconds(until: deadline)
+                remainingSeconds = updatedRemainingSeconds
+
+                if updatedRemainingSeconds == 0 {
+                    submitQuiz(expectedSessionID: sessionID)
+                    return
+                }
+
+                do {
+                    try await Task.sleep(for: .seconds(1))
+                } catch {
+                    return
+                }
+            }
+        }
+    }
+
+    private func handleScenePhase(_ phase: ScenePhase) {
+        switch phase {
+        case .active:
+            resumeTimerIfNeeded()
+        case .inactive, .background:
+            pauseTimerTask()
+        @unknown default:
+            pauseTimerTask()
+        }
+    }
+
+    private func resumeTimerIfNeeded() {
+        guard case .activeQuiz = appState,
+              let sessionID = quizSessionID,
+              let deadline = quizDeadline else {
+            return
+        }
+
+        let updatedRemainingSeconds = QuizTimer.remainingSeconds(until: deadline)
+        remainingSeconds = updatedRemainingSeconds
+
+        if updatedRemainingSeconds == 0 {
+            submitQuiz(expectedSessionID: sessionID)
+        } else {
+            startTimer(for: sessionID)
+        }
+    }
+
+    private func pauseTimerTask() {
+        timerTask?.cancel()
+        timerTask = nil
+    }
+
+    private func invalidateTimer() {
+        pauseTimerTask()
+        quizSessionID = nil
+        quizDeadline = nil
+        remainingSeconds = 0
     }
 
     private func beginReview() {

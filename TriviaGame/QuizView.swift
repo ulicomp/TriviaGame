@@ -4,6 +4,7 @@ struct QuizView: View {
     let questions: [PreparedTriviaQuestion]
     @Binding var currentQuestionIndex: Int
     @Binding var selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID]
+    let remainingSeconds: Int
     let unansweredCount: Int
     let onSubmit: () -> Void
     let onChangeOptions: () -> Void
@@ -68,16 +69,19 @@ struct QuizView: View {
 
     private var progressHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Question \(currentQuestionIndex + 1) of \(questions.count)")
-                .font(.headline)
+            HStack {
+                Text("Question \(currentQuestionIndex + 1) of \(questions.count)")
+                    .font(.headline)
+
+                Spacer()
+
+                QuizTimerBadge(remainingSeconds: remainingSeconds)
+            }
 
             ProgressView(value: progress)
                 .tint(.purple)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Quiz progress")
-        .accessibilityValue("Question \(currentQuestionIndex + 1) of \(questions.count)")
     }
 
     private var navigationControls: some View {
@@ -133,6 +137,32 @@ struct QuizView: View {
         }
         .multilineTextAlignment(.center)
         .padding()
+    }
+}
+
+private struct QuizTimerBadge: View {
+    let remainingSeconds: Int
+
+    private var color: Color {
+        if remainingSeconds <= 10 {
+            return .red
+        }
+        if remainingSeconds <= 30 {
+            return .orange
+        }
+        return .purple
+    }
+
+    var body: some View {
+        Label(QuizTimer.formattedTime(remainingSeconds), systemImage: "clock.fill")
+            .font(.subheadline.monospacedDigit().weight(.semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(color.opacity(0.12), in: Capsule())
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Time remaining")
+            .accessibilityValue(QuizTimer.accessibilityDescription(remainingSeconds))
     }
 }
 
