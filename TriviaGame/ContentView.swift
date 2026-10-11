@@ -26,12 +26,21 @@ struct ContentView: View {
         case .completed(let result):
             ResultsView(
                 result: result,
+                onReviewAnswers: beginReview,
                 onPlayAgain: {
                     Task {
                         await loadQuiz(context: .replay)
                     }
                 },
                 onChangeOptions: returnToOptions
+            )
+        case .reviewing(let result):
+            QuizReviewView(
+                questions: preparedQuestions,
+                selectedAnswerIDs: selectedAnswerIDs,
+                onBackToResults: {
+                    returnToResults(result: result)
+                }
             )
         case .replaying:
             ReplayStatusView(
@@ -166,6 +175,16 @@ struct ContentView: View {
         appState = .completed(result)
     }
 
+    private func beginReview() {
+        guard case .completed(let result) = appState else { return }
+        appState = .reviewing(result)
+    }
+
+    private func returnToResults(result: QuizResult) {
+        guard case .reviewing = appState else { return }
+        appState = .completed(result)
+    }
+
     private func canBeginLoading(context: LoadContext) -> Bool {
         switch (context, appState) {
         case (.options, .options(let loadState)):
@@ -189,6 +208,7 @@ private enum AppState {
     case options(LoadState)
     case activeQuiz
     case completed(QuizResult)
+    case reviewing(QuizResult)
     case replaying
     case replayFailure(String)
 }

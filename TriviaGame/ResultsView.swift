@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ResultsView: View {
     let result: QuizResult
+    let onReviewAnswers: () -> Void
     let onPlayAgain: () -> Void
     let onChangeOptions: () -> Void
 
@@ -48,9 +49,14 @@ struct ResultsView: View {
                     .multilineTextAlignment(.center)
 
                     VStack(spacing: 12) {
-                        Button("Play Again", action: onPlayAgain)
+                        Button("Review Answers", action: onReviewAnswers)
                             .buttonStyle(.borderedProminent)
                             .tint(.purple)
+                            .frame(maxWidth: .infinity)
+                            .accessibilityHint("Reviews each submitted answer and the correct answer")
+
+                        Button("Play Again", action: onPlayAgain)
+                            .buttonStyle(.bordered)
                             .frame(maxWidth: .infinity)
                             .accessibilityHint("Loads a new quiz using the same options")
 
