@@ -23,7 +23,10 @@ struct ResultsView: View {
                         completionHeader
                         scoreCard
                         statistics
-                        completionTimeCard
+                        if result.totalCount > 0,
+                           result.correctCount == result.totalCount {
+                            completionTimeCard
+                        }
                         actions
                     }
                     .padding(.horizontal, TriviaTheme.horizontalPadding)

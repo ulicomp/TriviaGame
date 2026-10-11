@@ -92,9 +92,9 @@ struct TriviaGameBackground<Content: View>: View {
         ZStack {
             LinearGradient(
                 colors: [
-                    TriviaTheme.primaryDeep,
-                    Color(red: 0.30, green: 0.10, blue: 0.72),
-                    TriviaTheme.primary
+                    Color(red: 0.30, green: 0.12, blue: 0.68),
+                    Color(red: 0.39, green: 0.16, blue: 0.80),
+                    Color(red: 0.48, green: 0.24, blue: 0.88)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
