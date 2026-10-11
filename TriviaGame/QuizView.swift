@@ -23,10 +23,11 @@ struct QuizView: View {
 
     var body: some View {
         NavigationStack {
-            TriviaBackground {
+            TriviaGameBackground {
                 Group {
                     if let currentQuestion {
                         VStack(spacing: 16) {
+                            gameHeader
                             progressHeader
 
                             ScrollView {
@@ -54,28 +55,7 @@ struct QuizView: View {
                     }
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: onChangeOptions) {
-                        Label("Options", systemImage: "chevron.left")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(TriviaTheme.primary)
-                    }
-                    .accessibilityLabel("Change Options")
-                    .accessibilityHint("Ends this quiz and returns to quiz options")
-                }
-
-                ToolbarItem(placement: .principal) {
-                    Text("Trivia Quiz")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(TriviaTheme.textPrimary)
-                }
-
-                ToolbarItem(placement: .topBarTrailing) {
-                    QuizTimerPill(remainingSeconds: remainingSeconds)
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .confirmationDialog(
                 unansweredConfirmationTitle,
                 isPresented: $isShowingUnansweredConfirmation,
@@ -89,21 +69,49 @@ struct QuizView: View {
         }
     }
 
+    private var gameHeader: some View {
+        HStack(spacing: 8) {
+            Button(action: onChangeOptions) {
+                Label("Options", systemImage: "chevron.left")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+            }
+            .frame(minHeight: 44)
+            .layoutPriority(2)
+            .accessibilityLabel("Change Options")
+            .accessibilityHint("Ends this quiz and returns to quiz options")
+
+            Spacer(minLength: 2)
+
+            Text("Trivia Quiz")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            Spacer(minLength: 2)
+
+            QuizTimerPill(remainingSeconds: remainingSeconds)
+                .layoutPriority(3)
+        }
+    }
+
     private var progressHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Question \(currentQuestionIndex + 1)")
                     .font(.system(.title2, design: .rounded, weight: .bold))
-                    .foregroundStyle(TriviaTheme.textPrimary)
+                    .foregroundStyle(.white)
 
                 Spacer()
 
                 Text("of \(questions.count)")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(TriviaTheme.textSecondary)
+                    .foregroundStyle(.white.opacity(0.76))
             }
 
-            TriviaProgressBar(progress: progress)
+            TriviaProgressBar(progress: progress, onDarkBackground: true)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Quiz progress")
@@ -118,7 +126,7 @@ struct QuizView: View {
             } label: {
                 Label("Previous", systemImage: "chevron.left")
             }
-            .buttonStyle(TriviaSecondaryButtonStyle())
+            .buttonStyle(TriviaGameSecondaryButtonStyle())
             .disabled(currentQuestionIndex == questions.startIndex)
             .opacity(currentQuestionIndex == questions.startIndex ? 0.45 : 1)
 
@@ -133,7 +141,7 @@ struct QuizView: View {
                         Image(systemName: "chevron.right")
                     }
                 }
-                .buttonStyle(TriviaPrimaryButtonStyle())
+                .buttonStyle(TriviaGamePrimaryButtonStyle())
             } else {
                 Button(action: requestSubmission) {
                     HStack {
@@ -141,7 +149,7 @@ struct QuizView: View {
                         Image(systemName: "checkmark.circle.fill")
                     }
                 }
-                .buttonStyle(TriviaPrimaryButtonStyle())
+                .buttonStyle(TriviaGamePrimaryButtonStyle())
                 .accessibilityHint("Finishes the quiz and calculates your score")
             }
         }
@@ -169,10 +177,11 @@ struct QuizView: View {
 
             Text("Quiz Unavailable")
                 .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(.white)
             Text("The current question could not be displayed.")
-                .foregroundStyle(TriviaTheme.textSecondary)
+                .foregroundStyle(.white.opacity(0.76))
             Button("Return to Options", action: onChangeOptions)
-                .buttonStyle(TriviaPrimaryButtonStyle())
+                .buttonStyle(TriviaGamePrimaryButtonStyle())
         }
         .multilineTextAlignment(.center)
         .padding(TriviaTheme.horizontalPadding)
@@ -192,17 +201,28 @@ private struct QuizTimerPill: View {
         return TriviaTheme.primary
     }
 
+    private var backgroundColor: Color {
+        if remainingSeconds <= 10 {
+            return Color(red: 1.0, green: 0.91, blue: 0.92)
+        }
+        if remainingSeconds <= 30 {
+            return Color(red: 1.0, green: 0.94, blue: 0.84)
+        }
+        return .white
+    }
+
     var body: some View {
         Label(QuizTimer.formattedTime(remainingSeconds), systemImage: "clock.fill")
-            .font(.caption.monospacedDigit().weight(.bold))
+            .font(.subheadline.monospacedDigit().weight(.bold))
             .foregroundStyle(color)
             .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(TriviaTheme.surface, in: Capsule())
+            .padding(.vertical, 8)
+            .background(backgroundColor, in: Capsule())
             .overlay {
-                Capsule().stroke(color.opacity(0.35), lineWidth: 1)
+                Capsule().stroke(color.opacity(0.45), lineWidth: 1)
             }
             .shadow(color: color.opacity(0.12), radius: 6, y: 3)
+            .fixedSize(horizontal: true, vertical: false)
             .animation(.easeInOut(duration: 0.2), value: color)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Time remaining")

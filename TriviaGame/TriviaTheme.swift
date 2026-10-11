@@ -73,6 +73,50 @@ struct TriviaBackground<Content: View>: View {
     }
 }
 
+struct TriviaGameBackground<Content: View>: View {
+    private let content: Content
+
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            decoration
+            content
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var decoration: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    TriviaTheme.primaryDeep,
+                    Color(red: 0.30, green: 0.10, blue: 0.72),
+                    TriviaTheme.primary
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+
+            Circle()
+                .fill(TriviaTheme.accent.opacity(0.22))
+                .frame(width: 300, height: 300)
+                .blur(radius: 8)
+                .offset(x: 170, y: -280)
+
+            Circle()
+                .fill(Color.white.opacity(0.055))
+                .frame(width: 250, height: 250)
+                .offset(x: -165, y: 350)
+        }
+        .accessibilityHidden(true)
+        .allowsHitTesting(false)
+    }
+}
+
 struct TriviaCard<Content: View>: View {
     private let content: Content
 
@@ -95,6 +139,7 @@ struct TriviaCard<Content: View>: View {
 
 struct TriviaProgressBar: View {
     let progress: Double
+    var onDarkBackground = false
 
     private var clampedProgress: Double {
         min(max(progress, 0), 1)
@@ -104,10 +149,18 @@ struct TriviaProgressBar: View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(TriviaTheme.border.opacity(0.55))
+                    .fill(onDarkBackground ? Color.white.opacity(0.22) : TriviaTheme.border.opacity(0.55))
 
                 Capsule()
-                    .fill(TriviaTheme.progressGradient)
+                    .fill(
+                        onDarkBackground
+                            ? LinearGradient(
+                                colors: [.white, Color(red: 0.88, green: 0.76, blue: 1.0)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                            : TriviaTheme.progressGradient
+                    )
                     .frame(width: geometry.size.width * clampedProgress)
             }
         }
@@ -150,6 +203,45 @@ struct TriviaSecondaryButtonStyle: ButtonStyle {
                     .stroke(TriviaTheme.border, lineWidth: 1.5)
             }
             .clipShape(RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius))
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}
+
+struct TriviaGamePrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline.weight(.bold))
+            .foregroundStyle(TriviaTheme.primaryDeep)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 54)
+            .padding(.horizontal, 18)
+            .background(
+                Color.white.opacity(configuration.isPressed ? 0.86 : 1),
+                in: RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius)
+            )
+            .shadow(color: Color.black.opacity(0.16), radius: 10, y: 5)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
+    }
+}
+
+struct TriviaGameSecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 52)
+            .padding(.horizontal, 18)
+            .background(
+                Color.white.opacity(configuration.isPressed ? 0.22 : 0.14),
+                in: RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: TriviaTheme.controlCornerRadius)
+                    .stroke(Color.white.opacity(0.34), lineWidth: 1.5)
+            }
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
             .animation(.easeOut(duration: 0.14), value: configuration.isPressed)
     }

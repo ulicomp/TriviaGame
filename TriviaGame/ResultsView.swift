@@ -17,7 +17,7 @@ struct ResultsView: View {
 
     var body: some View {
         NavigationStack {
-            TriviaBackground {
+            TriviaGameBackground {
                 ScrollView {
                     VStack(spacing: 22) {
                         completionHeader
@@ -40,7 +40,7 @@ struct ResultsView: View {
         VStack(spacing: 12) {
             ZStack {
                 Circle()
-                    .fill(TriviaTheme.brandGradient)
+                    .fill(Color.white.opacity(0.16))
                     .frame(width: 78, height: 78)
                     .shadow(color: TriviaTheme.primary.opacity(0.25), radius: 16, y: 8)
 
@@ -52,12 +52,12 @@ struct ResultsView: View {
 
             Text("Quiz Complete")
                 .font(.system(.largeTitle, design: .rounded, weight: .bold))
-                .foregroundStyle(TriviaTheme.textPrimary)
+                .foregroundStyle(.white)
                 .accessibilityAddTraits(.isHeader)
 
             Text(encouragement)
                 .font(.headline.weight(.semibold))
-                .foregroundStyle(TriviaTheme.primary)
+                .foregroundStyle(.white.opacity(0.82))
         }
         .multilineTextAlignment(.center)
     }
@@ -149,19 +149,19 @@ struct ResultsView: View {
             Button(action: onPlayAgain) {
                 Label("Play Again", systemImage: "arrow.clockwise")
             }
-            .buttonStyle(TriviaPrimaryButtonStyle())
+            .buttonStyle(TriviaGamePrimaryButtonStyle())
             .accessibilityHint("Loads a new quiz using the same options")
 
             Button(action: onReviewAnswers) {
                 Label("Review Answers", systemImage: "doc.text.magnifyingglass")
             }
-            .buttonStyle(TriviaSecondaryButtonStyle())
+            .buttonStyle(TriviaGameSecondaryButtonStyle())
             .accessibilityHint("Reviews each submitted answer and the correct answer")
 
             Button(action: onChangeOptions) {
                 Label("Change Options", systemImage: "slider.horizontal.3")
             }
-            .buttonStyle(TriviaSecondaryButtonStyle())
+            .buttonStyle(TriviaGameSecondaryButtonStyle())
             .accessibilityHint("Returns to the quiz options screen")
         }
     }
@@ -248,7 +248,7 @@ struct ReplayStatusView: View {
 
     var body: some View {
         NavigationStack {
-            TriviaBackground {
+            TriviaGameBackground {
                 VStack(spacing: 22) {
                     Spacer()
 

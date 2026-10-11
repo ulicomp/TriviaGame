@@ -19,10 +19,11 @@ struct QuizReviewView: View {
 
     var body: some View {
         NavigationStack {
-            TriviaBackground {
+            TriviaGameBackground {
                 Group {
                     if let currentQuestion {
                         VStack(spacing: 16) {
+                            reviewHeader
                             reviewProgress
 
                             ScrollView {
@@ -47,23 +48,27 @@ struct QuizReviewView: View {
                     }
                 }
             }
-            .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: onBackToResults) {
-                        Label("Results", systemImage: "chevron.left")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(TriviaTheme.primary)
-                    }
-                    .accessibilityLabel("Back to Results")
-                }
+            .toolbar(.hidden, for: .navigationBar)
+        }
+    }
 
-                ToolbarItem(placement: .principal) {
-                    Text("Answer Review")
-                        .font(.headline.weight(.bold))
-                        .foregroundStyle(TriviaTheme.textPrimary)
-                }
+    private var reviewHeader: some View {
+        HStack(spacing: 10) {
+            Button(action: onBackToResults) {
+                Label("Results", systemImage: "chevron.left")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
             }
+            .frame(minHeight: 44)
+            .accessibilityLabel("Back to Results")
+
+            Spacer()
+
+            Text("Answer Review")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(.white)
+                .lineLimit(1)
         }
     }
 
@@ -72,13 +77,14 @@ struct QuizReviewView: View {
             HStack(alignment: .firstTextBaseline) {
                 Text("Review \(currentQuestionIndex + 1)")
                     .font(.system(.title2, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
                 Spacer()
                 Text("of \(questions.count)")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(TriviaTheme.textSecondary)
+                    .foregroundStyle(.white.opacity(0.76))
             }
 
-            TriviaProgressBar(progress: progress)
+            TriviaProgressBar(progress: progress, onDarkBackground: true)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Answer review progress")
@@ -93,7 +99,7 @@ struct QuizReviewView: View {
             } label: {
                 Label("Previous", systemImage: "chevron.left")
             }
-            .buttonStyle(TriviaSecondaryButtonStyle())
+            .buttonStyle(TriviaGameSecondaryButtonStyle())
             .disabled(currentQuestionIndex == questions.startIndex)
             .opacity(currentQuestionIndex == questions.startIndex ? 0.45 : 1)
 
@@ -107,7 +113,7 @@ struct QuizReviewView: View {
                     Image(systemName: "chevron.right")
                 }
             }
-            .buttonStyle(TriviaPrimaryButtonStyle())
+            .buttonStyle(TriviaGamePrimaryButtonStyle())
             .disabled(currentQuestionIndex + 1 >= questions.count)
             .opacity(currentQuestionIndex + 1 >= questions.count ? 0.45 : 1)
         }
@@ -121,10 +127,11 @@ struct QuizReviewView: View {
                 .accessibilityHidden(true)
             Text("Review Unavailable")
                 .font(.system(.title2, design: .rounded, weight: .bold))
+                .foregroundStyle(.white)
             Text("This answer review could not be displayed.")
-                .foregroundStyle(TriviaTheme.textSecondary)
+                .foregroundStyle(.white.opacity(0.76))
             Button("Back to Results", action: onBackToResults)
-                .buttonStyle(TriviaPrimaryButtonStyle())
+                .buttonStyle(TriviaGamePrimaryButtonStyle())
         }
         .multilineTextAlignment(.center)
         .padding(TriviaTheme.horizontalPadding)
