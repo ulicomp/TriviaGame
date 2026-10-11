@@ -4,7 +4,11 @@ struct QuizView: View {
     let questions: [PreparedTriviaQuestion]
     @Binding var currentQuestionIndex: Int
     @Binding var selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID]
+    let unansweredCount: Int
+    let onSubmit: () -> Void
     let onChangeOptions: () -> Void
+
+    @State private var isShowingUnansweredConfirmation = false
 
     private var currentQuestion: PreparedTriviaQuestion? {
         guard questions.indices.contains(currentQuestionIndex) else { return nil }
@@ -49,6 +53,16 @@ struct QuizView: View {
                         .accessibilityHint("Ends this quiz and returns to quiz options")
                 }
             }
+            .confirmationDialog(
+                unansweredConfirmationTitle,
+                isPresented: $isShowingUnansweredConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Submit Anyway", action: onSubmit)
+                Button("Keep Reviewing", role: .cancel) {}
+            } message: {
+                Text("Unanswered questions count as incorrect.")
+            }
         }
     }
 
@@ -86,11 +100,24 @@ struct QuizView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(.purple)
             } else {
-                Button("Submit Quiz") {}
+                Button("Submit Quiz", action: requestSubmission)
                     .buttonStyle(.borderedProminent)
-                    .disabled(true)
-                    .accessibilityHint("Quiz submission will be added in the next pass")
+                    .tint(.purple)
+                    .accessibilityHint("Finishes the quiz and calculates your score")
             }
+        }
+    }
+
+    private var unansweredConfirmationTitle: String {
+        let noun = unansweredCount == 1 ? "question" : "questions"
+        return "You have \(unansweredCount) unanswered \(noun). Submit anyway?"
+    }
+
+    private func requestSubmission() {
+        if unansweredCount > 0 {
+            isShowingUnansweredConfirmation = true
+        } else {
+            onSubmit()
         }
     }
 

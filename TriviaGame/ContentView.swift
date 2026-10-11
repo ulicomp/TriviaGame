@@ -6,25 +6,53 @@ struct ContentView: View {
     @State private var preparedQuestions: [PreparedTriviaQuestion] = []
     @State private var currentQuestionIndex = 0
     @State private var selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID] = [:]
-    @State private var isShowingQuiz = false
-    @State private var loadState = LoadState.idle
+    @State private var appState = AppState.options(.idle)
 
     private let triviaService = TriviaService()
 
     var body: some View {
-        if isShowingQuiz {
+        switch appState {
+        case .options(let loadState):
+            optionsView(loadState: loadState)
+        case .activeQuiz:
             QuizView(
                 questions: preparedQuestions,
                 currentQuestionIndex: $currentQuestionIndex,
                 selectedAnswerIDs: $selectedAnswerIDs,
+                unansweredCount: unansweredCount,
+                onSubmit: submitQuiz,
                 onChangeOptions: returnToOptions
             )
-        } else {
-            optionsView
+        case .completed(let result):
+            ResultsView(
+                result: result,
+                onPlayAgain: {
+                    Task {
+                        await loadQuiz(context: .replay)
+                    }
+                },
+                onChangeOptions: returnToOptions
+            )
+        case .replaying:
+            ReplayStatusView(
+                errorMessage: nil,
+                onRetry: {},
+                onChangeOptions: returnToOptions
+            )
+        case .replayFailure(let message):
+            ReplayStatusView(
+                errorMessage: message,
+                onRetry: {
+                    Task {
+                        await loadQuiz(context: .replay)
+                    }
+                },
+                onChangeOptions: returnToOptions
+            )
         }
     }
 
-    private var optionsView: some View {
+    private func optionsView(loadState: LoadState) -> some View {
         NavigationStack {
             Form {
                 Section("Quiz Options") {
@@ -57,7 +85,7 @@ struct ContentView: View {
                 Section {
                     Button {
                         Task {
-                            await startTrivia()
+                            await loadQuiz(context: .options)
                         }
                     } label: {
                         HStack {
@@ -73,14 +101,14 @@ struct ContentView: View {
                     .disabled(loadState.isLoading)
                 }
 
-                statusSection
+                statusSection(loadState: loadState)
             }
             .navigationTitle("Trivia Game")
         }
     }
 
     @ViewBuilder
-    private var statusSection: some View {
+    private func statusSection(loadState: LoadState) -> some View {
         switch loadState {
         case .idle, .loading:
             EmptyView()
@@ -92,36 +120,82 @@ struct ContentView: View {
         }
     }
 
-    @MainActor
-    private func startTrivia() async {
-        guard !loadState.isLoading else { return }
+    private var unansweredCount: Int {
+        preparedQuestions.reduce(into: 0) { count, question in
+            guard let selectedAnswerID = selectedAnswerIDs[question.id],
+                  question.answerChoices.contains(where: { $0.id == selectedAnswerID }) else {
+                count += 1
+                return
+            }
+        }
+    }
 
-        loadState = .loading
+    @MainActor
+    private func loadQuiz(context: LoadContext) async {
+        guard canBeginLoading(context: context) else { return }
+
+        resetQuizData()
+        appState = context == .options ? .options(.loading) : .replaying
 
         do {
             questions = try await triviaService.fetchQuestions(configuration: configuration)
             preparedQuestions = try PreparedTriviaQuestion.prepare(questions)
             selectedAnswerIDs = [:]
             currentQuestionIndex = 0
-            loadState = .idle
-            isShowingQuiz = true
+            appState = .activeQuiz
         } catch {
-            questions = []
-            preparedQuestions = []
-            selectedAnswerIDs = [:]
-            currentQuestionIndex = 0
-            loadState = .failure(error.localizedDescription)
+            resetQuizData()
+            appState = context == .options
+                ? .options(.failure(error.localizedDescription))
+                : .replayFailure(error.localizedDescription)
         }
     }
 
     private func returnToOptions() {
+        resetQuizData()
+        appState = .options(.idle)
+    }
+
+    private func submitQuiz() {
+        guard case .activeQuiz = appState else { return }
+
+        let result = QuizResult.calculate(
+            questions: preparedQuestions,
+            selectedAnswerIDs: selectedAnswerIDs
+        )
+        appState = .completed(result)
+    }
+
+    private func canBeginLoading(context: LoadContext) -> Bool {
+        switch (context, appState) {
+        case (.options, .options(let loadState)):
+            !loadState.isLoading
+        case (.replay, .completed), (.replay, .replayFailure):
+            true
+        default:
+            false
+        }
+    }
+
+    private func resetQuizData() {
         questions = []
         preparedQuestions = []
         selectedAnswerIDs = [:]
         currentQuestionIndex = 0
-        loadState = .idle
-        isShowingQuiz = false
     }
+}
+
+private enum AppState {
+    case options(LoadState)
+    case activeQuiz
+    case completed(QuizResult)
+    case replaying
+    case replayFailure(String)
+}
+
+private enum LoadContext: Equatable {
+    case options
+    case replay
 }
 
 private enum LoadState {

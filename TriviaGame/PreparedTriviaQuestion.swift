@@ -29,15 +29,22 @@ struct PreparedTriviaQuestion: Identifiable {
             throw QuizPreparationError.invalidQuestion(number: id + 1)
         }
 
-        let answerTexts: [String]
+        let preparedAnswers: [(text: String, isCorrect: Bool)]
         if question.type == "boolean" {
-            answerTexts = ["True", "False"]
+            preparedAnswers = ["True", "False"].map { answer in
+                (text: answer, isCorrect: answer == decodedCorrectAnswer)
+            }
         } else {
             let combinedAnswers = [decodedCorrectAnswer] + decodedIncorrectAnswers
             guard combinedAnswers.allSatisfy({ !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) else {
                 throw QuizPreparationError.invalidQuestion(number: id + 1)
             }
-            answerTexts = combinedAnswers.shuffled()
+            preparedAnswers = combinedAnswers
+                .enumerated()
+                .map { index, answer in
+                    (text: answer, isCorrect: index == 0)
+                }
+                .shuffled()
         }
 
         self.id = id
@@ -46,8 +53,12 @@ struct PreparedTriviaQuestion: Identifiable {
         difficulty = HTMLTextDecoder.decode(question.difficulty)
         type = HTMLTextDecoder.decode(question.type)
         correctAnswer = decodedCorrectAnswer
-        answerChoices = answerTexts.enumerated().map { choiceIndex, answer in
-            TriviaAnswerChoice(id: choiceIndex, text: answer)
+        answerChoices = preparedAnswers.enumerated().map { choiceIndex, answer in
+            TriviaAnswerChoice(
+                id: choiceIndex,
+                text: answer.text,
+                isCorrect: answer.isCorrect
+            )
         }
     }
 }
@@ -55,6 +66,7 @@ struct PreparedTriviaQuestion: Identifiable {
 struct TriviaAnswerChoice: Identifiable {
     let id: Int
     let text: String
+    let isCorrect: Bool
 }
 
 enum QuizPreparationError: LocalizedError {
