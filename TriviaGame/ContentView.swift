@@ -252,9 +252,24 @@ struct ContentView: View {
             return
         }
 
+        let totalDuration = QuizTimer.duration(forQuestionCount: preparedQuestions.count)
+        let completionTimeSeconds: Int
+        if let quizDeadline {
+            completionTimeSeconds = QuizTimer.elapsedSeconds(
+                totalDuration: totalDuration,
+                deadline: quizDeadline
+            )
+        } else {
+            completionTimeSeconds = min(
+                max(totalDuration - remainingSeconds, 0),
+                totalDuration
+            )
+        }
+
         let result = QuizResult.calculate(
             questions: preparedQuestions,
-            selectedAnswerIDs: selectedAnswerIDs
+            selectedAnswerIDs: selectedAnswerIDs,
+            completionTimeSeconds: completionTimeSeconds
         )
 
         invalidateTimer()

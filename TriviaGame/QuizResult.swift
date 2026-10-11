@@ -4,6 +4,7 @@ struct QuizResult {
     let correctCount: Int
     let totalCount: Int
     let answeredCount: Int
+    let completionTimeSeconds: Int
 
     var unansweredCount: Int {
         max(totalCount - answeredCount, 0)
@@ -16,7 +17,8 @@ struct QuizResult {
 
     static func calculate(
         questions: [PreparedTriviaQuestion],
-        selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID]
+        selectedAnswerIDs: [PreparedTriviaQuestion.ID: TriviaAnswerChoice.ID],
+        completionTimeSeconds: Int
     ) -> QuizResult {
         var correctCount = 0
         var answeredCount = 0
@@ -36,7 +38,8 @@ struct QuizResult {
         return QuizResult(
             correctCount: correctCount,
             totalCount: questions.count,
-            answeredCount: answeredCount
+            answeredCount: answeredCount,
+            completionTimeSeconds: max(completionTimeSeconds, 0)
         )
     }
 }

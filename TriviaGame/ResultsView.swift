@@ -23,6 +23,7 @@ struct ResultsView: View {
                         completionHeader
                         scoreCard
                         statistics
+                        completionTimeCard
                         actions
                     }
                     .padding(.horizontal, TriviaTheme.horizontalPadding)
@@ -85,6 +86,40 @@ struct ResultsView: View {
                 statCards
             }
         }
+    }
+
+    private var completionTimeCard: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "clock.fill")
+                .font(.title3.weight(.bold))
+                .foregroundStyle(TriviaTheme.primary)
+                .frame(width: 42, height: 42)
+                .background(TriviaTheme.surfaceTint, in: RoundedRectangle(cornerRadius: 13))
+                .accessibilityHidden(true)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Completion Time")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(TriviaTheme.textSecondary)
+                Text(QuizTimer.formattedTime(result.completionTimeSeconds))
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .foregroundStyle(TriviaTheme.textPrimary)
+            }
+
+            Spacer()
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .background(TriviaTheme.surface, in: RoundedRectangle(cornerRadius: 18))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18)
+                .stroke(TriviaTheme.primary.opacity(0.18), lineWidth: 1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Completion time")
+        .accessibilityValue(
+            QuizTimer.durationAccessibilityDescription(result.completionTimeSeconds)
+        )
     }
 
     @ViewBuilder

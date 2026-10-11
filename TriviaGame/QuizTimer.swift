@@ -11,6 +11,19 @@ enum QuizTimer {
         max(0, Int(ceil(deadline.timeIntervalSince(now))))
     }
 
+    static func elapsedSeconds(
+        totalDuration: Int,
+        deadline: Date,
+        now: Date = .now
+    ) -> Int {
+        let clampedDuration = max(totalDuration, 0)
+        let remaining = min(
+            remainingSeconds(until: deadline, now: now),
+            clampedDuration
+        )
+        return clampedDuration - remaining
+    }
+
     static func formattedTime(_ seconds: Int) -> String {
         let clampedSeconds = max(seconds, 0)
         let minutes = clampedSeconds / 60
@@ -19,6 +32,10 @@ enum QuizTimer {
     }
 
     static func accessibilityDescription(_ seconds: Int) -> String {
+        durationAccessibilityDescription(seconds) + " remaining"
+    }
+
+    static func durationAccessibilityDescription(_ seconds: Int) -> String {
         let clampedSeconds = max(seconds, 0)
         let minutes = clampedSeconds / 60
         let remainingSeconds = clampedSeconds % 60
@@ -32,6 +49,6 @@ enum QuizTimer {
             parts.append("\(remainingSeconds) \(remainingSeconds == 1 ? "second" : "seconds")")
         }
 
-        return parts.joined(separator: " ") + " remaining"
+        return parts.joined(separator: " ")
     }
 }
