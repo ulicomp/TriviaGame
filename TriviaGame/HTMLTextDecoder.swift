@@ -1,7 +1,7 @@
 import UIKit
 
 enum HTMLTextDecoder {
-    static func decode(_ text: String) -> String {
+    nonisolated static func decode(_ text: String) -> String {
         guard text.contains("&"), text.contains(";") else { return text }
         guard let data = text.data(using: .utf8) else { return text }
 
